@@ -7,6 +7,7 @@ from openpyxl.styles import Font
 
 import itertools
 import pandas as pd
+from collections import namedtuple
 from openpyxl.styles import Font
 
 hora_elementar = [(8, 9), (9, 10), (10, 11), (11, 12), (14, 16), (16, 17), (17, 18)]
@@ -14,67 +15,46 @@ horarios = [(8, 10), (10, 12), (14, 16), (16, 18)]  # 2h
 horarios += [(14, 17)]  # 3
 horarios += [(14, 18)]  # 4
 horarios += [(8, 9), (9, 10), (10, 11), (11, 12), (14, 15)]  # 1
-
 horarios = sorted(horarios)
+
+Horario = namedtuple("Horario", "inicio fim")
+horarios = [Horario(*x) for x in horarios]
+
 dias = ['seg', 'ter', 'quar', 'quin', 'sex']
 dias_dic = {dias[i]: i for i in range(len(dias))}
 dias_patter = {1: [set([d]) for d in dias]}
-# dias_patter[2] = [set([dias[0], dias[2]]), set([dias[1], dias[3]]), set([dias[2], dias[4]])]
-# dias_patter[2] += [set([dias[0], dias[1]]), set([dias[1], dias[2]]), set([dias[2], dias[3]]), set([dias[3], dias[4]])]
 dias_patter[2] = [set(d) for d in itertools.combinations(dias, 2)]
-# dias_patter[3] = [set(d) for d in itertools.combinations(dias, 3)]
-# dias_patter[3] = [set([dias[0], dias[2], dias[4]])]
 
 slots_pool = list(itertools.product(horarios, dias_patter[1]))
 slots_pool += list(itertools.product(horarios, dias_patter[2]))
-
-
 # slots_pool += list(itertools.product(horarios, dias_patter[3]))
-
+Slot = namedtuple("Slot", "hora dias")
+slots_pool = [Slot(*x) for x in slots_pool]
 
 def slots(disc_ch, proibir_dias, proibir_horarios, fixar_dias, fixar_hora, prof_externo):
+    """
+
+    :param disc_ch:
+    :param proibir_dias:
+    :param proibir_horarios:
+    :param fixar_dias:
+    :param fixar_hora:
+    :param prof_externo:
+    :return: lista de slots no pool compatíveis com as restrições
+    """
     l = []
     for i, s in enumerate(slots_pool):
-        time = (s[0][1] - s[0][0]) * len(s[1]) * 15
+        time = (s.hora.fim - s.hora.inicio) * len(s.dias) * 15
         if disc_ch <= time <= disc_ch + 15 \
-                and s[1].isdisjoint(proibir_dias) \
-                and not horario_colide(s[0], proibir_horarios):
-            if s[0][1] - s[0][0] >= 4 and not prof_externo:
+                and s.dias.isdisjoint(proibir_dias) \
+                and not horario_colide(s.hora, proibir_horarios):
+            if s.hora.fim - s.hora.inicio >= 4 and not prof_externo:
                 continue
-            if len(fixar_dias) == 0 or s[1].issubset(fixar_dias):
-                if fixar_hora[0] == 0 or (fixar_hora[0] <= s[0][0] and s[0][1] <= fixar_hora[1]):
+            if len(fixar_dias) == 0 or s.dias.issubset(fixar_dias):
+                if fixar_hora[0] == 0 or (fixar_hora[0] <= s.hora.inicio and s.hora.fim <= fixar_hora[1]):
                     l.append(i)
     return l
 
-
-# def slots(disc_ch, proibir_dias, proibir_horarios):
-#     l = []
-#     if disc_ch == 15 or disc_ch == 30:
-#         for i, s in enumerate(slots_pool):
-#             if s[0] not in proibir_horarios and len(s[1].intersection(proibir_dias)) == 0:
-#                 if len(s[1]) == 1 and s[0] != '14-17':
-#                     l.append(i)
-#     if disc_ch == 45:
-#         for i, s in enumerate(slots_pool):
-#             if s[0] not in proibir_horarios and len(s[1].intersection(proibir_dias)) == 0:
-#                 if len(s[1]) == 1 and s[0] == '14-17':
-#                     l.append(i)
-#                 elif len(s[1]) == 2 and s[0] != '14-17':
-#                     l.append(i)
-#     if disc_ch == 60:
-#         for i, s in enumerate(slots_pool):
-#             if s[0] not in proibir_horarios and len(s[1].intersection(proibir_dias)) == 0:
-#                 if len(s[1]) == 2 and s[0] != '14-17':
-#                     l.append(i)
-#     if disc_ch == 90:
-#         for i, s in enumerate(slots_pool):
-#             if s[0] not in proibir_horarios and len(s[1].intersection(proibir_dias)) == 0:
-#                 if len(s[1]) == 2 and s[0] == '14-17':
-#                     l.append(i)
-#                 elif len(s[1]) == 3 and s[0] != '14-17':
-#                     l.append(i)
-#     return l
-#
 
 def read_input(filepath="input.ods"):
     disc_df = pd.read_excel(filepath, sheet_name="disciplinas")
