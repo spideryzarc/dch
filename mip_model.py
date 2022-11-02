@@ -1,3 +1,5 @@
+from typing import List
+
 import gurobipy as gp
 from gurobipy import GRB
 from openpyxl.styles import Font
@@ -31,9 +33,10 @@ slots_pool += list(itertools.product(horarios, dias_patter[2]))
 Slot = namedtuple("Slot", "hora dias")
 slots_pool = [Slot(*x) for x in slots_pool]
 
+
 def slots(disc_ch, proibir_dias, proibir_horarios, fixar_dias, fixar_hora, prof_externo):
     """
-
+    Lista os slots no pool compatíveis com as restrições
     :param disc_ch:
     :param proibir_dias:
     :param proibir_horarios:
@@ -42,7 +45,7 @@ def slots(disc_ch, proibir_dias, proibir_horarios, fixar_dias, fixar_hora, prof_
     :param prof_externo:
     :return: lista de slots no pool compatíveis com as restrições
     """
-    l = []
+    l: list[int] = []
     for i, s in enumerate(slots_pool):
         time = (s.hora.fim - s.hora.inicio) * len(s.dias) * 15
         if disc_ch <= time <= disc_ch + 15 \
@@ -238,43 +241,58 @@ def make_semestre_output(sem_timetable, prof_df, disc_df, grade):
     return por_semestre_df
 
 
-def slot_penalty(slot_cod, prof_dias, priorizar):
+def slot_penalty(slot_cod):
     slot = slots_pool[slot_cod]
-    if priorizar == 'h':
-        p_h = 1e6
-        p_d = 1e3
-    else:
-        p_h = 1e3
-        p_d = 1e6
-    p = p_d * len(slot[1] - prof_dias)
-    # p=0
-    if slot[0][1] >= 18:
-        p += p_h
-    elif slot[0][1] >= 17:
-        p += 1e1
-    elif slot[0][1] >= 12:
-        p += 1e0
-    elif slot[0][1] == 9:
-        p += 1e1
+    p = 0
+    # if slot.hora.fim >= 18:
+    #     p = 1e6
+    if slot.hora.fim >= 17:
+        p = 1e1
+    elif slot.hora.fim >= 12:
+        p = 1
+    elif slot.hora.fim == 9:
+        p = 1
 
-    if slot[0][1] >= 16 and 'sex' in slot[1]:
-        p += 1e2
+    if slot.hora.fim >= 16 and 'sex' in slot.dias:
+        p += 1e1
 
     if len(slot[1]) == 2:
         l = list(slot[1])
-        p += abs(abs(dias_dic[l[1]] - dias_dic[l[0]]) - 2) * 1e1
+        p += abs(abs(dias_dic[l[1]] - dias_dic[l[0]]) - 2) * 1e2
     return p
 
 
-# def slot_penalty(slot_cod, prof_dias):
+# def slot_penalty(slot_cod, prof_dias, priorizar,x=''):
 #     slot = slots_pool[slot_cod]
-#     p = 1e9 * len(slot[1] - prof_dias)
-#     if slot[0] == '14-17':
-#         p += 1e3
-#     if slot[0] == '16-18':
-#         p += 5e3
-#     return p
 #
+#     if x == 'd':
+#         return len(slot.dias - prof_dias)
+#
+#     if priorizar == 'h':
+#         p_h = 1e6
+#         p_d = 1e3
+#     else:
+#         p_h = 1e3
+#         p_d = 1e6
+#     p = p_d * len(slot[1] - prof_dias)
+#     # p=0
+#     if slot[0][1] >= 18:
+#         p += p_h
+#     elif slot[0][1] >= 17:
+#         p += 1e1
+#     elif slot[0][1] >= 12:
+#         p += 1e0
+#     elif slot[0][1] == 9:
+#         p += 1e1
+#
+#     if slot[0][1] >= 16 and 'sex' in slot[1]:
+#         p += 1e2
+#
+#     if len(slot[1]) == 2:
+#         l = list(slot[1])
+#         p += abs(abs(dias_dic[l[1]] - dias_dic[l[0]]) - 2) * 1e1
+#     return p
+
 
 def horario_colide(h1, h2):
     if h2[0] <= h1[0] < h2[1]:
@@ -283,16 +301,6 @@ def horario_colide(h1, h2):
         return True
     return False
 
-
-# def horario_colide(h1, h2):
-#     if h1[:2] == h2[:2]:
-#         return True
-#     if h1 == '14-17' and h2 == '16-18':
-#         return True
-#     if h2 == '14-17' and h1 == '16-18':
-#         return True
-#     return False
-#
 
 def model():
     disc_df, prof_df, prof_compativeis, ignore_disc, ignore_prof, grades_unique, semestres_unique = read_input(
@@ -311,24 +319,21 @@ def model():
             priorizar = prof_df.loc[p]['priorizar']
             for s in slots(disc_df.loc[d]['ch'], disc_proibir_dia[d], disc_proibir_hora[d], disc_fixar_dia[d],
                            disc_fixar_hora[d], prof_ext):
-                x[d, p, s] = model.addVar(obj=slot_penalty(s, prof_dias_dic[p], priorizar), vtype='b',
-                                          name=f'x_{d}_{p}_{s}')
+                x[d, p, s] = model.addVar(obj=0, vtype='b', name=f'x_{d}_{p}_{s}')
 
-    ch_max_pen = {p: model.addVar(obj=1e9, vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index}
+    ch_max_pen = {p: model.addVar(obj=0, vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index}
     ch_min_pen = {p: model.addVar(obj=0, vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index if
                   prof_df.loc[p]['ch_min'] > 0}
     ch = {p: model.addVar(vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index}
     ch_a = {p: model.addVar(obj=1, vtype=GRB.CONTINUOUS, name=f'ch_a_{p}') for p in prof_df.index}
     ch_b = {p: model.addVar(obj=1, vtype=GRB.CONTINUOUS, name=f'ch_b_{p}') for p in prof_df.index}
 
-    colisao = {(h, d, s, g): model.addVar(obj=9e12, vtype=GRB.INTEGER, name='col') for h in hora_elementar for d in dias
+    colisao = {(h, d, s, g): model.addVar(obj=0, vtype=GRB.INTEGER, name='col') for h in hora_elementar for d in dias
                for s in semestres_unique for g in grades_unique}
 
-    prof_dia = {(p, d): model.addVar(obj=0e2, vtype=GRB.BINARY, name=f'pd_{p}{d}') for p in prof_df.index for d in dias}
+    prof_dia = {(p, d): model.addVar(obj=0, vtype=GRB.BINARY, name=f'pd_{p}{d}') for p in prof_df.index for d in dias}
 
     model.update()
-    media = round(sum(disc_df['ch']) / len(prof_df))
-    print("Carga horária média:", media)
     # prof dias
     for p in prof_df.index:
         for dia in dias:
@@ -338,13 +343,24 @@ def model():
         exp = [prof_dia[p, dia] for dia in dias]
         model.addConstr(sum(exp) <= prof_df.loc[p]['dias_max'])
         # model.addConstr(sum(exp) <= 2)
+
+    media = sum(disc_df['ch']) / len(prof_df)
+    print("Carga horária média Geral:", media)
+
+    soma = sum(disc_df['ch'])
+    prof_abaixo_media = prof_df[prof_df.ch_max < media]['ch_max']
+    media = (soma - sum(prof_abaixo_media)) / (len(prof_df) - len(prof_abaixo_media))
+    print("Carga horária média para quem não tem redução abaixo da média:", media)
+    media = round(media)  # acelera o branch and bound
     # carga horaria
     for p in prof_df.index:
+        pch_max = prof_df.loc[p]['ch_max']
+        M = media if pch_max >= media else pch_max
         model.addConstr(ch[p] >= 1)
-        model.addConstr(ch[p] - media <= ch_a[p])
-        model.addConstr(media - ch[p] <= ch_b[p])
+        model.addConstr(ch[p] - M <= ch_a[p])
+        model.addConstr(M - ch[p] <= ch_b[p])
         model.addConstr(sum(x[d, p, s] * disc_df.loc[d]['ch'] for d, pp, s in x.keys() if p == pp) == ch[p], f'ch_{p}')
-        model.addConstr(ch[p] <= prof_df.loc[p]['ch_max'] + 15 * ch_max_pen[p])
+        model.addConstr(ch[p] <= pch_max + 15 * ch_max_pen[p])
         # model.addConstr(ch[p] <= 195)
         if prof_df.loc[p]['ch_min'] > 0:
             model.addConstr(ch[p] + 15 * ch_min_pen[p] >= prof_df.loc[p]['ch_min'])
@@ -389,7 +405,25 @@ def model():
     # model.setObjective(sum(ch[p]**2 for p in ch.keys()),GRB.MINIMIZE)
     model.update()
     # model.setObjective(model.getObjective() + sum([ch[p] ** 2 for p in prof_df.index]), GRB.MINIMIZE)
-    model.setParam('TimeLimit',60 * 20)
+
+    model.setObjectiveN(sum(colisao.values()), 0, 7, name="colisão")
+    model.setObjectiveN(sum(ch_max_pen.values()) + sum(ch_min_pen.values()), 1, 6, abstol=3, name="limite ch")
+    model.setObjectiveN(sum(ch_a.values()) + sum(ch_b.values()), 2, 5, abstol=150, name="balanço ch")
+    model.setObjectiveN(sum([prof_dia[p, d] for p, d in prof_dia.keys() if d not in prof_dias_dic[p]]), 3, 4,
+                        name="dias convenience")
+    # print([(p,d) for p, d in prof_dia.keys() if d not in prof_dias_dic[p]])
+    model.setObjectiveN(
+        sum([x[d, p, s] for d, p, s in x.keys() if disc_fixar_hora[d] == (0, 0) and slots_pool[s].hora.fim >= 18]), 4,
+        3,
+        abstol=0, name="hora 18 convenience")
+
+    model.setObjectiveN(sum([x[d, p, s] * slot_penalty(s) for d, p, s in x.keys() if disc_fixar_hora[d] == (0, 0)]), 5,
+                        2,
+                        reltol=.10, name="hora convenience")
+
+    model.setObjectiveN(sum([prof_dia[p, d] for p, d in prof_dia.keys()]), 6, 1, name="prof dias")
+
+    model.setParam('TimeLimit', 60 * 20)
     model.optimize()
     # if colisao.X > 0:
     #     print("Atenção: Distribuição inviável")
