@@ -247,9 +247,9 @@ def slot_penalty(slot_cod):
     # if slot.hora.fim >= 18:
     #     p = 1e6
     if slot.hora.fim >= 17:
-        p = 1e1
+        p = 1e2
     elif slot.hora.fim >= 12:
-        p = 1
+        p = 2
     elif slot.hora.fim == 9:
         p = 1
 
@@ -257,8 +257,9 @@ def slot_penalty(slot_cod):
         p += 1e1
 
     if len(slot[1]) == 2:
+        #dias consecutivos
         l = list(slot[1])
-        p += abs(abs(dias_dic[l[1]] - dias_dic[l[0]]) - 2) * 1e2
+        p += abs(abs(dias_dic[l[1]] - dias_dic[l[0]]) - 2) * 1e1
     return p
 
 
@@ -407,23 +408,24 @@ def model():
     # model.setObjective(model.getObjective() + sum([ch[p] ** 2 for p in prof_df.index]), GRB.MINIMIZE)
 
     model.setObjectiveN(sum(colisao.values()), 0, 7, name="colisão")
-    model.setObjectiveN(sum(ch_max_pen.values()) + sum(ch_min_pen.values()), 1, 6, abstol=3, name="limite ch")
+    model.setObjectiveN(sum(ch_max_pen.values()) + sum(ch_min_pen.values()), 1, 6, abstol=2, name="limite ch")
     model.setObjectiveN(sum(ch_a.values()) + sum(ch_b.values()), 2, 5, abstol=150, name="balanço ch")
     model.setObjectiveN(sum([prof_dia[p, d] for p, d in prof_dia.keys() if d not in prof_dias_dic[p]]), 3, 4,
                         name="dias convenience")
     # print([(p,d) for p, d in prof_dia.keys() if d not in prof_dias_dic[p]])
     model.setObjectiveN(
         sum([x[d, p, s] for d, p, s in x.keys() if disc_fixar_hora[d] == (0, 0) and slots_pool[s].hora.fim >= 18]), 4,
-        3,
-        abstol=0, name="hora 18 convenience")
+        3, name="hora 18 convenience")
+
 
     model.setObjectiveN(sum([x[d, p, s] * slot_penalty(s) for d, p, s in x.keys() if disc_fixar_hora[d] == (0, 0)]), 5,
-                        2,
-                        reltol=.10, name="hora convenience")
+                        2, reltol=.01, name="hora convenience")
 
     model.setObjectiveN(sum([prof_dia[p, d] for p, d in prof_dia.keys()]), 6, 1, name="prof dias")
 
     model.setParam('TimeLimit', 60 * 20)
+    model.setParam('MIPGap', 0.015)
+    # model.setParam('MIPFocus', 1)
     model.optimize()
     # if colisao.X > 0:
     #     print("Atenção: Distribuição inviável")
