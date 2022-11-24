@@ -34,7 +34,7 @@ Slot = namedtuple("Slot", "hora dias")
 slots_pool = [Slot(*x) for x in slots_pool]
 
 
-def slots(disc_ch, proibir_dias, proibir_horarios, fixar_dias, fixar_hora, prof_externo):
+def slots(disc_ch, proibir_dias, proibir_horarios, fixar_dias, fixar_hora, prof_externo=False):
     """
     Lista os slots no pool compatíveis com as restrições
     :param disc_ch:
@@ -51,7 +51,10 @@ def slots(disc_ch, proibir_dias, proibir_horarios, fixar_dias, fixar_hora, prof_
         if disc_ch <= time <= disc_ch + 15 \
                 and s.dias.isdisjoint(proibir_dias) \
                 and not horario_colide(s.hora, proibir_horarios):
-            if s.hora.fim - s.hora.inicio >= 4 and not prof_externo:
+            # if s.hora.fim - s.hora.inicio >= 4 and not prof_externo:
+            #     continue
+            if s.hora.fim - s.hora.inicio >= 4 and fixar_hora[0] == 0:
+                # quatro horas, só com se o horario for prefixado
                 continue
             if len(fixar_dias) == 0 or s.dias.issubset(fixar_dias):
                 if fixar_hora[0] == 0 or (fixar_hora[0] <= s.hora.inicio and s.hora.fim <= fixar_hora[1]):
@@ -305,7 +308,7 @@ def horario_colide(h1, h2):
 
 def model():
     disc_df, prof_df, prof_compativeis, ignore_disc, ignore_prof, grades_unique, semestres_unique = read_input(
-        'input.ods')
+        'input2022.ods')
 
     model = gp.Model()
     x = {}
