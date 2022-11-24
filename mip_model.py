@@ -325,12 +325,12 @@ def model():
                            disc_fixar_hora[d], prof_ext):
                 x[d, p, s] = model.addVar(obj=0, vtype='b', name=f'x_{d}_{p}_{s}')
 
-    ch_max_pen = {p: model.addVar(obj=0, vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index}
-    ch_min_pen = {p: model.addVar(obj=0, vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index if
+    ch_max_pen = {p: model.addVar(obj=0, vtype=GRB.INTEGER, name=f'ch_{p}') for p in prof_df.index}
+    ch_min_pen = {p: model.addVar(obj=0, vtype=GRB.INTEGER, name=f'ch_{p}') for p in prof_df.index if
                   prof_df.loc[p]['ch_min'] > 0}
-    ch = {p: model.addVar(vtype=GRB.CONTINUOUS, name=f'ch_{p}') for p in prof_df.index}
-    ch_a = {p: model.addVar(obj=1, vtype=GRB.CONTINUOUS, name=f'ch_a_{p}') for p in prof_df.index}
-    ch_b = {p: model.addVar(obj=1, vtype=GRB.CONTINUOUS, name=f'ch_b_{p}') for p in prof_df.index}
+    ch = {p: model.addVar(vtype=GRB.INTEGER, name=f'ch_{p}') for p in prof_df.index}
+    ch_a = {p: model.addVar(obj=1, vtype=GRB.INTEGER, name=f'ch_a_{p}') for p in prof_df.index}
+    ch_b = {p: model.addVar(obj=1, vtype=GRB.INTEGER, name=f'ch_b_{p}') for p in prof_df.index}
 
     colisao = {(h, d, s, g): model.addVar(obj=0, vtype=GRB.INTEGER, name='col') for h in hora_elementar for d in dias
                for s in semestres_unique for g in grades_unique}
