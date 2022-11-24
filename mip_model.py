@@ -308,7 +308,7 @@ def horario_colide(h1, h2):
 
 def model():
     disc_df, prof_df, prof_compativeis, ignore_disc, ignore_prof, grades_unique, semestres_unique = read_input(
-        'input2022.ods')
+        'input.ods')
 
     model = gp.Model()
     x = {}
